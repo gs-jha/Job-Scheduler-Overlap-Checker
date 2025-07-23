@@ -60,3 +60,44 @@ func TestCheckOverlap(t *testing.T) {
 		})
 	}
 }
+func TestCheckOverlap_InvalidJSON(t *testing.T) {
+	handler := overlap.NewHandler()
+	req := httptest.NewRequest("POST", "/api/v1/check-overlap", bytes.NewBuffer([]byte("{invalid json")))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.CheckOverlap(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+	if got := rec.Body.String(); got != "Invalid request body\n" {
+		t.Errorf("expected body %q, got %q", "Invalid request body\n", got)
+	}
+}
+
+func TestCheckOverlap_InvalidRequestValidation(t *testing.T) {
+	handler := overlap.NewHandler()
+	// End before Start, should trigger validation error
+	reqBody := domain.OverlapRequest{
+		Range1: domain.TimeRange{
+			Start: time.Date(2025, 10, 1, 12, 0, 0, 0, time.UTC),
+			End:   time.Date(2025, 10, 1, 10, 0, 0, 0, time.UTC),
+		},
+		Range2: domain.TimeRange{
+			Start: time.Date(2025, 10, 1, 13, 0, 0, 0, time.UTC),
+			End:   time.Date(2025, 10, 1, 15, 0, 0, 0, time.UTC),
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest("POST", "/api/v1/check-overlap", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.CheckOverlap(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+	// The error message depends on ValidateOverlapRequest implementation
+}
